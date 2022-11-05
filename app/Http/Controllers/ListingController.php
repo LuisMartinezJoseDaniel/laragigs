@@ -17,16 +17,16 @@ class ListingController extends Controller
         // from the request-> get the query param called tag or search
         return view('listings.index', [
             'listings' => Listing::latest()
-                         ->filter(
-                            ['tag' =>$request->tag, 
-                             'search' => $request->search
-                            ])->paginate(6) //?page=2,?page=3 etc..for more items
+                ->filter(
+                    ['tag' => $request->tag,
+                        'search' => $request->search,
+                    ])->paginate(6), //?page=2,?page=3 etc..for more items
         ]);
     }
-    /* 
-    * @param() Listing $listing 
-    * it comes from Route-Model-Binding
-    */
+    /*
+     * @param() Listing $listing
+     * it comes from Route-Model-Binding
+     */
     public function show(Listing $listing)
     {
         return view('listings.show', ['listing' => $listing]);
@@ -40,25 +40,27 @@ class ListingController extends Controller
     //Store Listing Data
     public function store(Request $request)
     {
-    // get file from the request by default it saves the image on storage/app
-    //* We need to change config/filesystems -> default -> local to public
-    // dd($request->file('logo')->store());
+        // get file from the request by default it saves the image on storage/app
+        //* We need to change config/filesystems -> default -> local to public
+        // dd($request->file('logo')->store());
         $formFields = $request->validate([
             'title' => 'required|min:2',
             'company' => ['required', Rule::unique('listings', 'company')],
-            'location'=> 'required',
-            'website'=> 'required',
-            'email'=> ['required', 'email'],
-            'tags'=> 'required',
-            'description'=> 'required'
+            'location' => 'required',
+            'website' => 'required',
+            'email' => ['required', 'email'],
+            'tags' => 'required',
+            'description' => 'required',
         ]);
-        //* Get the Image 
-        if($request->hasFile('logo')){
+        //* Get the Image
+        if ($request->hasFile('logo')) {
             // Save on the array the path
             // then store at the same time the image in storage/app/public/logos
             // check config/fylesystem
-            $formFields['logo'] = $request->file('logo')->store('logos','public');
+            $formFields['logo'] = $request->file('logo')->store('logos', 'public');
         }
+
+        $formFields['user_id'] = auth()->id();
 
         Listing::create($formFields);
 
@@ -67,28 +69,34 @@ class ListingController extends Controller
         return redirect('/')->with('message', 'Listing created successfully!');
     }
 
-
-    public function edit(Listing $listing){
+    public function edit(Listing $listing)
+    {
         return view('listings.edit', ['listing' => $listing]);
     }
 
-    public function update(Request $request,Listing $listing){
+    public function update(Request $request, Listing $listing)
+    {
+        // Make sure logged in user is owner
+        if ($listing->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized Action');
+        }
+
         $formFields = $request->validate([
             'title' => 'required|min:2',
             'company' => ['required'],
-            'location'=> 'required',
-            'website'=> 'required',
-            'email'=> ['required', 'email'],
-            'tags'=> 'required',
-            'description'=> 'required'
+            'location' => 'required',
+            'website' => 'required',
+            'email' => ['required', 'email'],
+            'tags' => 'required',
+            'description' => 'required',
         ]);
 
-        //* Get the Image 
-        if($request->hasFile('logo')){
+        //* Get the Image
+        if ($request->hasFile('logo')) {
             // Save on the array the path
             // then store at the same time the image in storage/app/public/logos
             // check config/fylesystem
-            $formFields['logo'] = $request->file('logo')->store('logos','public');
+            $formFields['logo'] = $request->file('logo')->store('logos', 'public');
         }
 
         $listing->update($formFields); //* Update
@@ -98,10 +106,22 @@ class ListingController extends Controller
         return back()->with('message', 'Listing updated successfully!');
     }
 
-    public function destroy(Listing $listing){
+    public function destroy(Listing $listing)
+    {
+        // Make sure logged in user is owner
+        if ($listing->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized Action');
+        }
+
         $listing->delete();
         return to_route('listings.index')->with('message', 'Listing deleted successfully');
     }
 
+    public function manage()
+    {
+
+        return view('listings.manage',
+            ['listings' => auth()->user()->listings()->get()]);
+    }
 
 }
